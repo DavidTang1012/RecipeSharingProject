@@ -1,27 +1,314 @@
 <!-- views/recipe.ejs -->
 <%- include('partials/header') %>
 
-<div class="card mb-4">
-  <img src="<%= recipe.photo %>" class="card-img-top" alt="Recipe Image">
-  <div class="card-body">
-    <h3 class="card-title"><%= recipe.description %></h3>
-    <h5>Ingredients</h5>
-    <ul>
-      <% recipe.ingredient.forEach(item => { %>
-        <li><%= item %></li>
-      <% }) %>
-    </ul>
-    <h5>Instructions</h5>
-    <p><%= recipe.instruction %></p>
-    <p>Likes: <%= recipe.likes %></p>
-    <!-- You can add like button and comments functionality -->
+<!-- Category Navigation Bar -->
+<div class="mb-4">
+  <nav class="nav nav-pills">
+    <a class="nav-link <%= currentCategory === 'all' ? 'active' : '' %>" href="/?category=all">All</a>
+    <a class="nav-link <%= currentCategory === 'breakfast' ? 'active' : '' %>" href="/?category=breakfast">Breakfast</a>
+    <a class="nav-link <%= currentCategory === 'lunch' ? 'active' : '' %>" href="/?category=lunch">Lunch</a>
+    <a class="nav-link <%= currentCategory === 'dinner' ? 'active' : '' %>" href="/?category=dinner">Dinner</a>
+    <a class="nav-link <%= currentCategory === 'dessert' ? 'active' : '' %>" href="/?category=dessert">Dessert</a>
+  </nav>
+</div>
+
+  
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const cards = document.querySelectorAll(".card");
+
+    cards.forEach((card) => {
+      card.addEventListener("mouseenter", () => {
+        card.style.transform = "scale(1.03)";
+        card.style.transition = "transform 0.3s ease, box-shadow 0.3s ease";
+        card.style.boxShadow = "0 8px 16px rgba(0,0,0,0.3)";
+      });
+
+      card.addEventListener("mouseleave", () => {
+        card.style.transform = "scale(1)";
+        card.style.boxShadow = "none";
+      });
+    });
+  });
+</script>
+  
+  
+  
+  
+<div class="container mt-4">
+  <div class="card mb-4">
+    <% if (recipe.photo && /^https?:\/\//.test(recipe.photo)) { %>
+      <img src="<%= recipe.photo %>" class="card-img-top" alt="Recipe Image">
+    <% } else if (recipe.photo) { %>
+      <img src="data:image/jpeg;base64,<%= recipe.photo %>" class="card-img-top" alt="Recipe Image">
+    <% } else { %>
+      <img src="https://cdn.glitch.global/40caaa32-7609-49ce-895e-9832535559ab/FOOD.jpg?v=1734423437576" class="card-img-top" alt="Default Recipe Image">
+    <% } %>
+    <div class="card-body">
+      <!-- Recipe Description -->
+      <h3 class="card-title"><%= recipe.description %></h3>
+
+      <!-- Ingredients -->
+      <h5>Ingredients</h5>
+      <ul>
+        <% recipe.ingredient.forEach(item => { %>
+          <li><%= item %></li>
+        <% }) %>
+      </ul>
+
+      <!-- Instructions -->
+      <h5>Instructions</h5>
+      <p><%= recipe.instruction %></p>
+
+      <!-- Likes Display -->
+      <p>Likes: <span id="like-count"><%= recipe.likes || 0 %></span></p>
+
+      <!-- Like Button -->
+      <% if (user) { %>
+        <% if (hasLiked) { %>
+          <button id="unlike-btn" class="btn btn-danger">Unlike</button>
+        <% } else { %>
+          <button id="like-btn" class="btn btn-primary">Like</button>
+        <% } %>
+      <% } else { %>
+        <p><a href="/users/login">Log in</a> to like this recipe.</p>
+      <% } %>
+    </div>
   </div>
-</div>
 
-<div class="comments-section">
+  <!-- Author Information -->
+  <% if (creator) { %>
+    <div class="mb-4">
+      <h5>Recipe Created By:</h5>
+      <p><%= creator.first_name %> <%= creator.last_name %></p>
+    </div>
+  <% } %>
+
+  <!-- Comments Section -->
+<div class="comments-section mt-4">
   <h4>Comments</h4>
-  <!-- Display comments -->
-  <% /* Iterate over comments and display */ %>
+  
+  <% if (user) { %>
+    <!-- Comment Form -->
+    <form id="comment-form" class="mb-4">
+      <div class="form-group">
+        <textarea class="form-control" id="comment-content" rows="3" 
+                  placeholder="Add a comment..." required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary mt-2">Post Comment</button>
+    </form>
+  <% } else { %>
+    <p><a href="/users/login">Log in</a> to add a comment.</p>
+  <% } %>
+
+  <!-- Comments List
+<div id="comments-list">
+  <% if (comments && comments.length > 0) { %>
+    <% comments.forEach(comment => { %>
+      <div class="card mb-3" id="comment-<%= comment._id %>">
+        <div class="card-body">
+          <h6 class="card-subtitle mb-2">
+            <%= comment.authorName || 'Anonymous User' %>
+            <span class="text-muted"> • 
+              <%= new Date(comment.created_time).toLocaleDateString() %>
+            </span>
+          </h6>
+          <p class="card-text"><%= comment.content %></p>
+          <% if (user && comment.uid.toString() === user._id.toString()) { %>
+            <button class="btn btn-sm btn-danger float-end delete-comment" 
+                    data-comment-id="<%= comment._id %>">
+              Delete
+            </button>
+          <% } %>
+        </div>
+      </div>
+    <% }); %>
+  <% } else { %>
+    <p class="text-muted">No comments yet. Be the first to comment!</p>
+  <% } %>
 </div>
 
-<%- include('partials/footer') %>
+<!-- scripts -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+  const commentForm = document.getElementById('comment-form');
+  if (commentForm) {
+    commentForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const content = document.getElementById('comment-content').value;
+      
+      try {
+        const response = await fetch('/comments/<%= recipe._id %>', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ content })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          // Add new comment to the list
+          const commentsList = document.getElementById('comments-list');
+          const commentHtml = `
+            <div class="card mb-3" id="comment-${data.comment._id}">
+              <div class="card-body">
+                <h6 class="card-subtitle mb-2">
+                  ${data.comment.authorName}
+                  <span class="text-muted"> • 
+                    ${new Date(data.comment.created_time).toLocaleDateString()}
+                  </span>
+                </h6>
+                <p class="card-text">${data.comment.content}</p>
+                <button class="btn btn-sm btn-danger float-end delete-comment" 
+                        data-comment-id="${data.comment._id}">
+                  Delete
+                </button>
+              </div>
+            </div>
+          `;
+          commentsList.insertAdjacentHTML('afterbegin', commentHtml);
+          commentForm.reset();
+        } else {
+          alert(data.message || 'Error posting comment');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error posting comment');
+      }
+    });
+  }
+
+    // Delete comment functionality
+    document.addEventListener('click', async function(e) {
+      if (e.target.classList.contains('delete-comment')) {
+        if (confirm('Are you sure you want to delete this comment?')) {
+          const commentId = e.target.dataset.commentId;
+          try {
+            const response = await fetch(`/comments/${commentId}`, {
+              method: 'DELETE'
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+              document.getElementById(`comment-${commentId}`).remove();
+            } else {
+              alert(data.message || 'Error deleting comment');
+            }
+          } catch (error) {
+            console.error('Error:', error);
+            alert('Error deleting comment');
+          }
+        }
+      }
+    });
+  });
+</script> -->
+
+
+<!-- Like Button Script -->
+<script>
+  <% if (user) { %>
+    <% if (hasLiked) { %>
+      // User has already liked: show "Unlike" functionality
+      document.getElementById('unlike-btn').addEventListener('click', async () => {
+        try {
+          const response = await fetch('/recipes/unlike/<%= recipe._id %>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            document.getElementById('like-count').innerText = data.likes;
+            // Switch button back to Like
+            const unlikeBtn = document.getElementById('unlike-btn');
+            unlikeBtn.outerHTML = `<button id="like-btn" class="btn btn-primary">Like</button>`;
+
+            document.getElementById('like-btn').addEventListener('click', async () => {
+              try {
+                const likeResponse = await fetch('/recipes/like/<%= recipe._id %>', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+
+                const likeData = await likeResponse.json();
+
+                if (likeData.success) {
+                  document.getElementById('like-count').innerText = likeData.likes;
+                  document.getElementById('like-btn').innerText = 'Liked';
+                  document.getElementById('like-btn').classList.remove('btn-primary');
+                  document.getElementById('like-btn').classList.add('btn-danger');
+                  document.getElementById('like-btn').id = 'unlike-btn';
+                } else {
+                  alert(likeData.message || 'Cannot like this recipe.');
+                }
+              } catch (error) {
+                console.error('Error : ', error);
+                alert('Error when liking a recipe. Please log in.');
+              }
+            });
+          } else {
+            alert(data.message || 'Cannot unlike this recipe.');
+          }
+        } catch (error) {
+          console.error('Error: ', error);
+          alert('Error when unliking a recipe. Please log in.');
+        }
+      });
+    <% } else { %>
+      // User has not liked: show "Like" functionality
+      document.getElementById('like-btn').addEventListener('click', async () => {
+        try {
+          const response = await fetch('/recipes/like/<%= recipe._id %>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            document.getElementById('like-count').innerText = data.likes;
+            // Switch button to Unlike
+            const likeBtn = document.getElementById('like-btn');
+            likeBtn.outerHTML = `<button id="unlike-btn" class="btn btn-danger">Unlike</button>`;
+
+            document.getElementById('unlike-btn').addEventListener('click', async () => {
+              try {
+                const unlikeResponse = await fetch('/recipes/unlike/<%= recipe._id %>', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+
+                const unlikeData = await unlikeResponse.json();
+
+                if (unlikeData.success) {
+                  document.getElementById('like-count').innerText = unlikeData.likes;
+                  document.getElementById('unlike-btn').innerText = 'Like';
+                  document.getElementById('unlike-btn').classList.remove('btn-danger');
+                  document.getElementById('unlike-btn').classList.add('btn-primary');
+                  document.getElementById('unlike-btn').id = 'like-btn';
+                } else {
+                  alert(unlikeData.message || 'Cannot unlike this recipe.');
+                }
+              } catch (error) {
+                console.error('Error: ', error);
+                alert('Error when unliking a recipe. Please log in.');
+              }
+            });
+          } else {
+            alert(data.message || 'Cannot like this recipe.');
+          }
+        } catch (error) {
+          console.error('Error: ', error);
+          alert('Error when liking a recipe. Please log in.');
+        }
+      });
+    <% } %>
+  <% } %>
+</script>
+      

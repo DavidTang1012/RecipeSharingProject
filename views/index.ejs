@@ -20,21 +20,19 @@
   </div>
 </div>
 
+
+
+
+
+  
 <!-- Category Navigation Bar -->
-<div class="mb-4">
-  <nav class="nav nav-pills">
-    <a class="nav-link <%= currentCategory === 'all' ? 'active' : '' %>" 
-       href="/?category=all">All</a>
-    <a class="nav-link <%= currentCategory === 'breakfast' ? 'active' : '' %>" 
-       href="/?category=breakfast">Breakfast</a>
-    <a class="nav-link <%= currentCategory === 'lunch' ? 'active' : '' %>" 
-       href="/?category=lunch">Lunch</a>
-    <a class="nav-link <%= currentCategory === 'dinner' ? 'active' : '' %>" 
-       href="/?category=dinner">Dinner</a>
-    <a class="nav-link <%= currentCategory === 'dessert' ? 'active' : '' %>" 
-       href="/?category=dessert">Dessert</a>
-  </nav>
-</div>
+<nav class="nav nav-pills mb-4 justify-content-center" style="box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+  <a class="nav-link <%= currentCategory === 'all' ? 'active' : '' %>" href="/?category=all">All</a>
+  <a class="nav-link <%= currentCategory === 'breakfast' ? 'active' : '' %>" href="/?category=breakfast">Breakfast</a>
+  <a class="nav-link <%= currentCategory === 'lunch' ? 'active' : '' %>" href="/?category=lunch">Lunch</a>
+  <a class="nav-link <%= currentCategory === 'dinner' ? 'active' : '' %>" href="/?category=dinner">Dinner</a>
+  <a class="nav-link <%= currentCategory === 'dessert' ? 'active' : '' %>" href="/?category=dessert">Dessert</a>
+</nav>
 
 <% if (currentCategory && currentCategory !== 'all') { %>
   <!-- Category Recipes List -->
@@ -45,12 +43,19 @@
         <% recipes.forEach(recipe => { %>
           <div class="col-md-4 mb-4">
             <div class="card h-100">
-              <img src="<%= recipe.photo %>" class="card-img-top" alt="Recipe Image">
+              <% if (recipe.photo && /^https?:\/\//.test(recipe.photo)) { %>
+                <img src="<%= recipe.photo %>" class="card-img-top" alt="Recipe Image">
+              <% } else if (recipe.photo) { %>
+                <img src="data:image/jpeg;base64,<%= recipe.photo %>" class="card-img-top" alt="Recipe Image">
+              <% } else { %>
+                <img src="https://cdn.glitch.global/40caaa32-7609-49ce-895e-9832535559ab/FOOD.jpg?v=1734423437576" class="card-img-top" alt="Default Recipe Image">
+              <% } %>
               <div class="card-body">
                 <h5 class="card-title">
                   <a href="/recipes/<%= recipe._id %>"><%= recipe.description %></a>
                 </h5>
-                <p class="card-text">Likes: <%= recipe.likes %></p>
+                <p class="card-text">Likes: <span class="like-count"><%= recipe.likes %></span></p>
+                <button class="like-btn btn btn-sm btn-primary" data-recipe-id="<%= recipe._id %>">Like</button>
                 <a href="/recipes/<%= recipe._id %>" class="btn btn-sm btn-primary">View Recipe</a>
               </div>
             </div>
@@ -71,14 +76,21 @@
       <div class="card mb-3" style="max-width: 540px;">
         <div class="row no-gutters">
           <div class="col-md-4">
-            <img src="<%= dailyRecipe.photo %>" class="card-img" alt="Daily Recipe">
+            <% if (dailyRecipe.photo && /^https?:\/\//.test(dailyRecipe.photo)) { %>
+              <img src="<%= dailyRecipe.photo %>" class="card-img" alt="Daily Recipe">
+            <% } else if (dailyRecipe.photo) { %>
+              <img src="data:image/jpeg;base64,<%= dailyRecipe.photo %>" class="card-img" alt="Daily Recipe">
+            <% } else { %>
+              <img src="https://cdn.glitch.global/40caaa32-7609-49ce-895e-9832535559ab/FOOD.jpg?v=1734423437576" class="card-img" alt="Default Recipe Image">
+            <% } %>
           </div>
           <div class="col-md-8">
             <div class="card-body">
               <h5 class="card-title">
                 <a href="/recipes/<%= dailyRecipe._id %>"><%= dailyRecipe.description %></a>
               </h5>
-              <p class="card-text">Likes: <%= dailyRecipe.likes %></p>
+              <p class="card-text">Likes: <span class="like-count"><%= dailyRecipe.likes %></span></p>
+              <button class="like-btn btn btn-sm btn-primary" data-recipe-id="<%= dailyRecipe._id %>">Like</button>
               <a href="/recipes/<%= dailyRecipe._id %>" class="btn btn-sm btn-primary">View Recipe</a>
             </div>
           </div>
@@ -98,16 +110,28 @@
         <% hotRecipes.forEach(recipe => { %>
           <div class="col-md-4">
             <div class="card mb-3">
-              <img src="<%= recipe.photo %>" class="card-img-top" alt="Hot Recipe">
+              <% if (recipe.photo && /^https?:\/\//.test(recipe.photo)) { %>
+                <img src="<%= recipe.photo %>" class="card-img-top" alt="Hot Recipe">
+              <% } else if (recipe.photo) { %>
+                <img src="data:image/jpeg;base64,<%= recipe.photo %>" class="card-img-top" alt="Hot Recipe">
+              <% } else { %>
+                <img src="https://cdn.glitch.global/40caaa32-7609-49ce-895e-9832535559ab/FOOD.jpg?v=1734423437576" class="card-img-top" alt="Default Recipe Image">
+              <% } %>
               <div class="card-body">
                 <h5 class="card-title">
                   <a href="/recipes/<%= recipe._id %>"><%= recipe.description %></a>
                 </h5>
-                <p class="card-text">Likes: <%= recipe.likes %></p>
+                <p class="card-text">Likes: <span class="like-count"><%= recipe.likes %></span></p>
+                <button class="like-btn btn btn-sm btn-primary" data-recipe-id="<%= recipe._id %>">Like</button>
+                <a href="/recipes/<%= recipe._id %>" class="btn btn-sm btn-primary">View Recipe</a>
               </div>
             </div>
           </div>
         <% }) %>
+      <% } else { %>
+        <div class="col-12">
+          <p>No hot recipes available.</p>
+        </div>
       <% } %>
     </div>
   </div>
@@ -120,7 +144,13 @@
         <% topCooks.forEach(cook => { %>
           <div class="col-md-4">
             <div class="card mb-3">
-              <img src="<%= cook.profile.photo || '/images/default-avatar.png' %>" class="card-img-top" alt="Chef Avatar">
+              <% if (cook.profile.photo && /^https?:\/\//.test(cook.profile.photo)) { %>
+                <img src="<%= cook.profile.photo %>" class="card-img-top" alt="Chef Avatar">
+              <% } else if (cook.profile.photo) { %>
+                <img src="data:image/jpeg;base64,<%= cook.profile.photo %>" class="card-img-top" alt="Chef Avatar">
+              <% } else { %>
+                <img src="https://cdn.glitch.global/40caaa32-7609-49ce-895e-9832535559ab/chef.jpeg?v=1734429966680" class="card-img-top" alt="Default Avatar">
+              <% } %>
               <div class="card-body">
                 <h5 class="card-title"><%= cook.profile.first_name %> <%= cook.profile.last_name %></h5>
                 <p class="card-text">Likes: <!-- Add data as needed --></p>
@@ -128,9 +158,77 @@
             </div>
           </div>
         <% }) %>
+      <% } else { %>
+        <div class="col-12">
+          <p>No top cooks available.</p>
+        </div>
       <% } %>
     </div>
   </div>
 <% } %>
 
 <%- include('partials/footer') %>
+
+<!-- Like and Unlike Button Script -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const likeButtons = document.querySelectorAll('.like-btn');
+    const unlikeButtons = document.querySelectorAll('.unlike-btn');
+
+    // 處理 Like 按鈕
+    likeButtons.forEach(button => {
+      button.addEventListener('click', async function() {
+        const recipeId = this.getAttribute('data-recipe-id');
+        try {
+          // 發送喜歡的請求
+          const response = await fetch('/recipes/like/' + recipeId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            // 更新喜歡數量
+            document.getElementById('like-count-' + recipeId).innerText = data.likes;
+            // 更改按鈕為 Unlike
+            this.outerHTML = `<button class="btn btn-danger unlike-btn" data-recipe-id="${recipeId}">Unlike</button>`;
+          } else {
+            alert(data.message || 'Cannot like this reciep. Login Please.');
+          }
+        } catch (error) {
+          console.error('Error', error);
+          alert('Error when like recipe. Login Please.');
+        }
+      });
+    });
+
+    // 處理 Unlike 按鈕
+    unlikeButtons.forEach(button => {
+      button.addEventListener('click', async function() {
+        const recipeId = this.getAttribute('data-recipe-id');
+        try {
+          // 發送取消喜歡的請求
+          const response = await fetch('/recipes/unlike/' + recipeId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            // 更新喜歡數量
+            document.getElementById('like-count-' + recipeId).innerText = data.likes;
+            // 更改按鈕為 Like
+            this.outerHTML = `<button class="btn btn-primary like-btn" data-recipe-id="${recipeId}">Like</button>`;
+          } else {
+            alert(data.message || 'Cannot dislike this recipe. Login Please.');
+          }
+        } catch (error) {
+          console.error('Error: ', error);
+          alert('Error when dislike recipe. Login Please.');
+        }
+      });
+    });
+  });
+</script>

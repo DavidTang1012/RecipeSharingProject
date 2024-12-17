@@ -3,9 +3,30 @@ const express = require('express');
 const router = express.Router();
 const Recipe = require('../models/Recipe');
 const RecipeUser = require('../models/RecipeUser');
+const Comment = require('../models/Comment');
+const Profile = require('../models/Profile');
+const Like = require('../models/Like'); // Import Like model
 const { ensureAuthenticated } = require('../config/auth');
+const multer = require('multer'); // Import Multer
+const path = require('path');
 
-// Add recipe page - must before search by id and category
+// Configure Multer storage to store files in memory
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Only images are allowed'));
+  },
+  limits: { fileSize: 5 * 1024 * 1024 } // 5 MB limit
+});
+
+// Add recipe page - must be before search by id and category
 router.get('/add', ensureAuthenticated, (req, res) => {
   res.render('add_recipe', {
     errors: [],
@@ -18,8 +39,10 @@ router.get('/add', ensureAuthenticated, (req, res) => {
   });
 });
 
-// Add recipe handling
-router.post('/add', ensureAuthenticated, async (req, res) => {
+// Add recipe handling with Multer middleware
+router.post('/add', ensureAuthenticated, upload.single('photo'), async (req, res) => {
+  console.log("request body : ", req.body);
+  console.log("request file : ", req.file); // Log the file for debugging
   const { description, ingredient, instruction, category } = req.body;
   let errors = [];
 
@@ -45,7 +68,8 @@ router.post('/add', ensureAuthenticated, async (req, res) => {
       ingredient: ingredient.split(',').map(item => item.trim()),
       instruction,
       category,
-      photo: req.file ? req.file.buffer.toString('base64') : null
+      photo: req.file ? req.file.buffer.toString('base64') : null,
+      likes: 0 
     });
     
     const savedRecipe = await newRecipe.save();
@@ -73,7 +97,36 @@ router.post('/add', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// View single recipe - 必须放在 /add 路由之后
+// Like recipe handling
+router.post('/like/:id', ensureAuthenticated, async (req, res) => {
+  try {
+    const recipeId = req.params.id;
+    const userId = req.user._id;
+
+    // Check if the user has already liked the recipe
+    const existingLike = await Like.findOne({ rid: recipeId, uid: userId });
+    if (existingLike) {
+      return res.status(400).json({ success: false, message: 'You already liked this recipe.' });
+    }
+
+    // Insert new like record
+    await new Like({ rid: recipeId, uid: userId }).save();
+
+    // Increment the likes count in the Recipe model
+    const updatedRecipe = await Recipe.findByIdAndUpdate(
+      recipeId,
+      { $inc: { likes: 1 } },
+      { new: true }
+    );
+
+    res.json({ success: true, likes: updatedRecipe.likes });
+  } catch (err) {
+    console.error('Error while liking recipe:', err);
+    res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
+});
+
+// View single recipe
 router.get('/:id', async (req, res) => {
   try {
     const recipe = await Recipe.findById(req.params.id);
@@ -82,16 +135,86 @@ router.get('/:id', async (req, res) => {
       return res.redirect('/');
     }
 
+        // Get comments for this recipe
+    const comments = await Comment.find({ rid: recipe._id })
+      .sort({ created_time: -1 });
+
+    // Get profiles for all comment authors
+    const profiles = await Profile.find({
+      uid: { $in: comments.map(comment => comment.uid) }
+    });
+
+    // Map profiles to comments
+    const commentsWithProfiles = await Promise.all(comments.map(async comment => {
+      const profile = profiles.find(p => p.uid.toString() === comment.uid.toString());
+      return {
+        ...comment.toObject(),
+        authorName: profile ? `${profile.first_name} ${profile.last_name}` : 'Anonymous User',
+        created_time: comment.created_time,
+        isAuthor: req.user && comment.uid.toString() === req.user._id.toString()
+      };
+    }));
+    
+    // Count likes
+    const likeCount = await Like.countDocuments({ rid: recipe._id });
+
+    // Find the user who created the recipe
     const recipeUser = await RecipeUser.findOne({ rid: recipe._id }).populate('uid');
+    
+
+    // Determine if the current user has liked this recipe
+    let hasLiked = false;
+    if (req.user) {
+      const existingLike = await Like.findOne({ rid: recipe._id, uid: req.user._id });
+      if (existingLike) {
+        hasLiked = true;
+      }
+    }
+
+    // Set currentCategory to the recipe's category or default to 'all'
+    const currentCategory = recipe.category || 'all';
 
     res.render('recipe', { 
-      recipe,
-      creator: recipeUser ? recipeUser.uid : null 
+      recipe: { ...recipe._doc, likes: likeCount }, 
+      creator: recipeUser ? recipeUser.uid : null,
+      currentCategory,
+      hasLiked,
+      comments: comments || [],
+      user: req.user || null 
     });
   } catch (err) {
     console.error(err);
     req.flash('error', 'Error loading recipe');
     res.redirect('/');
+  }
+});
+
+// Unlike recipe handling
+router.post('/unlike/:id', ensureAuthenticated, async (req, res) => {
+  try {
+    const recipeId = req.params.id;
+    const userId = req.user._id;
+
+    // Find the existing like
+    const existingLike = await Like.findOne({ rid: recipeId, uid: userId });
+    if (!existingLike) {
+      return res.status(400).json({ success: false, message: 'You have not liked this recipe.' });
+    }
+
+    // Remove the Like document
+    await Like.findByIdAndDelete(existingLike._id);
+
+    // Decrement the likes count in the Recipe model
+    const updatedRecipe = await Recipe.findByIdAndUpdate(
+      recipeId,
+      { $inc: { likes: -1 } },
+      { new: true }
+    );
+
+    res.json({ success: true, likes: updatedRecipe.likes });
+  } catch (err) {
+    console.error('Error while unliking recipe:', err);
+    res.status(500).json({ success: false, message: 'Internal server error.' });
   }
 });
 
